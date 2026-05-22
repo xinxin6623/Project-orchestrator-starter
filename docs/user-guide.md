@@ -27,7 +27,7 @@ aliases: [使用手册, 用户指南]
             澄清       对标参照     拆原子任务     派工执行
 ```
 
-四个阶段串起来。每阶段都落一个 markdown 文件到 `runs/<日期>-<项目短名>/`，[[state-machine]] 文件记录"现在跑到哪、下一步做什么"。
+四个阶段串起来。每阶段都落一个 markdown 文件到 `runs/<日期>-<项目短名>/`，其中 [state.md](../runs/_state-template.md) 记录"现在跑到哪、下一步做什么"。
 
 详细机制看 [[architecture-tuning#四阶段流水线]]。
 
@@ -52,7 +52,7 @@ aliases: [使用手册, 用户指南]
 > 继续未完成的 Run `<id>`，还是开新任务？
 
 - **新任务** → 描述你要做什么 → 它判级别 → 你确认 → 开跑
-- **续跑** → 它读 [[state-machine|state.md]] 接着上次的位置干
+- **续跑** → 它读 [state.md 模板](../runs/_state-template.md) 接着上次的位置干
 
 ---
 
@@ -61,18 +61,22 @@ aliases: [使用手册, 用户指南]
 每个 Run 产出一个文件夹 `runs/<日期>-<项目短名>/`：
 
 ```
+index.md             ★ Run 索引（中文导览，建议先读这个）
 00-input.md          你的原始需求（追溯用）
 01-frame.md          已知 / 未知 / 假设 三栏
 02-anchor.md         对标了哪份样本（C 级）
 03-decompose.md      拆成了几个原子任务（C 级）
 04-execute/
-  worker-*.md        每个子任务的产出
+  supervisor-*.md    Supervisor 自任的串行任务
+  worker-*.md        派给 Worker 的并行任务
   final.md           ★ 这个就是给你的成品
 review.md            自查或差异分析
 state.md             机器读的状态机（你别动）
 ```
 
-**你只需要看 `04-execute/final.md` 和 `review.md`**，其他是过程档案，出问题时用来回溯。
+**最短路径**：先看 [`index.md`](#) 知道整个 Run 怎么回事 → 直接读 `04-execute/final.md` 拿成品 → 不放心再读 `review.md` 看自查。
+
+`index.md` 在 `final.md` 产出后**自动生成**（B/C 级强制，见 [[architecture-tuning#结构性铁律 改之前必读|铁律 7]]），包含一句话回顾、文件地图、各文件中文说明、关键决策汇总。出问题回溯时它是入口。
 
 ---
 
@@ -80,13 +84,13 @@ state.md             机器读的状态机（你别动）
 
 ### Phase 1（Frame）阶段
 - 会问 1-3 个澄清问题（默认动态模式，没必要不会问）
-- **必问项**：年级、地方政策约束、验收方（在 [[constraints#brainstorm]] 可改）
+- **必问项**：年级、地方政策约束、验收方（在 [config/constraints.md](../config/constraints.md) 的 `[brainstorm]` 段可改）
 - 你也可以主动补一段长背景，省得它问
 
 ### Phase 2（Anchor）阶段
 - 会给你提议一份"参照样本"，你可以同意、换一份、或要求跳过
 - **跳过有代价**：成品没参照，可能套话偏多。Supervisor 会先警告并要你确认
-- 库里没合适样本时会退化为 rubric 兜底，原理见 [[architecture-tuning#anchor-机制]]
+- 库里没合适样本时会退化为 rubric 兜底，原理见 [[architecture-tuning#Anchor 机制]]
 
 ### Phase 3（Decompose）阶段
 - 给你看任务清单：每个 10-30 分钟一块，标好串行/并行
@@ -95,7 +99,19 @@ state.md             机器读的状态机（你别动）
 ### Phase 4（Execute）阶段
 - 默认 **每阶段结束都停一下让你看**（checkpoint）
 - 不满意可以触发 rework（默认最多 2 轮，超了升级给你裁决）
-- 想全自动跑完最后看，把 [[constraints#execute|human_checkpoint]] 改成 `per_project`
+- 想全自动跑完最后看，把 [config/constraints.md](../config/constraints.md) 里 `[execute]` 段的 `human_checkpoint` 改成 `per_project`
+
+### Phase 4 之后：成品反馈
+
+拿到 `final.md` 后任何"看不懂 / 不认同 / 不可行"的疑问，**直接说**。Supervisor 按性质分三条路径处理：
+
+| 反馈类型 | 例子 | 处理路径 |
+|---------|------|---------|
+| **解释类** | "X 是什么？""为什么这样设计？""能不能删？" | Supervisor 当场答 + 决定是否回写到 final.md 的【设计意图】段（[constraints `[execute]`](../config/constraints.md) 的 `require_design_rationale`） |
+| **修改类** | "X 太密""砍掉 X""时长不够" | 触发 rework，回到 Phase 3（结构）或 Phase 4（单环节）重做 |
+| **结构类** | "整个方向偏了""对象错了" | 回 Phase 1 改假设，后面阶段自动重跑 |
+
+反馈本身会进 [log/feedback-loop.md](../log/feedback-loop.md)（如不存在，第一次反馈时创建）。同类反馈反复出现 → 触发 [[architecture-tuning#调参手柄]] 中对应参数调整。
 
 ---
 
@@ -112,27 +128,27 @@ state.md             机器读的状态机（你别动）
 | "跳过 Phase 1" | 直接进执行。慎用 |
 | "重做这一段" | 触发 rework |
 | "停，让我看看" | 强制 checkpoint |
-| "把 max_questions 改成 1" | 改完写进 [[constraints]] 下次生效 |
+| "把 max_questions 改成 1" | 改完写进 [config/constraints.md](../config/constraints.md) 下次生效 |
 
-所有豁免都会被记进 [[state-machine|state.md]] 和 [[tuning-history]]，事后能查为什么这样跑。
+所有豁免都会被记进当前 Run 的 `state.md` 和 [log/tuning-history.md](../log/tuning-history.md)，事后能查为什么这样跑。
 
 ### B. 改文件（中等）
 
-- **[[constraints|config/constraints.md]]** — 全局参数面板，所有可调项都在这。改完**下次 Run 生效**，进行中的不动
-- **`config/project-types/`** — 项目类型预设。复制 `_template.md` 起一个新的
-- **`anchors/index.md` + `anchors/positive/`** — 往样本库里加你过往的成功方案，越多 Phase 2 越准。加入方法见 [[architecture-tuning#anchor-机制]]
+- **[config/constraints.md](../config/constraints.md)** — 全局参数面板，所有可调项都在这。改完**下次 Run 生效**，进行中的不动
+- **[config/project-types/](../config/project-types/)** — 项目类型预设。复制 `_template.md` 起一个新的
+- **[anchors/index.md](../anchors/index.md) + [anchors/positive/](../anchors/positive/)** — 往样本库里加你过往的成功方案，越多 Phase 2 越准。加入方法见 [[architecture-tuning#Anchor 机制]]
 
 ### C. 改规则（重，慎用）
 
-- **`CLAUDE.md`** — 系统铁律。改前看 [[architecture-tuning#结构性铁律]]，有些不能动
+- **[CLAUDE.md](../CLAUDE.md)** — 系统铁律。改前看 [[architecture-tuning#结构性铁律 改之前必读]]，有些不能动
 - **`runs/<id>/state.md`** — Supervisor 维护的状态机，**手动改可能破坏断点续跑**
 
 ---
 
 ## 注意事项
 
-1. **首次使用前**：在 `anchors/positive/` 放 2-3 份你过往的成功方案（哪怕是别人的），Phase 2 效果立刻不一样。没样本也能跑，但成品会偏"通用"
-2. **跳过 Anchor 的代价**：Phase 4 验收没标尺，套话/政策搬运/回避地方差异都更难识别。例子见 `runs/2026-05-21-5th-grade-carbon-shiyou/state.md` 里 `skipped_reason` 段
+1. **首次使用前**：在 [anchors/positive/](../anchors/positive/) 放 2-3 份你过往的成功方案（哪怕是别人的），Phase 2 效果立刻不一样。没样本也能跑，但成品会偏"通用"
+2. **跳过 Anchor 的代价**：Phase 4 验收没标尺，套话/政策搬运/回避地方差异都更难识别。例子见 [runs/2026-05-21-5th-grade-carbon-shiyou/state.md](../runs/2026-05-21-5th-grade-carbon-shiyou/state.md) 里 `skipped_reason` 段
 3. **不要打断 Phase 4 的 Worker**：每个 Worker 是无全局上下文的子智能体，打断了它不知道前因后果，重启需要 Supervisor 重新派工
 4. **跨会话续跑**：关掉 Claude Code 不丢进度，下次进来会问你恢复哪个 Run
 5. **A 级任务**：不会强行走流程，会问你"启用完整四阶段吗"，回 n 就是普通对话
@@ -145,10 +161,11 @@ state.md             机器读的状态机（你别动）
 |------|------|
 | 跑到一半想推倒重来 | 直接说"重开"，旧 Run 留档不删 |
 | 成品方向错了 | 让它回到 Phase 1 改澄清，后面阶段会自动重跑 |
+| 成品里某处看不懂/想问"为什么" | 见上文"Phase 4 之后：成品反馈"，直接问即可 |
 | state.md 看着像坏了 | 别手改，跟 Supervisor 说"state 有问题"让它修 |
-| 同一个错连续 rework 2 次还不行 | 系统会自动升级让你裁决，并写进 `log/failure-cases.md` |
-| 想看历史调参 | `log/tuning-history.md` |
-| 想看踩过的坑 | `log/failure-cases.md` |
+| 同一个错连续 rework 2 次还不行 | 系统会自动升级让你裁决，并写进 [log/failure-cases.md](../log/failure-cases.md) |
+| 想看历史调参 | [log/tuning-history.md](../log/tuning-history.md) |
+| 想看踩过的坑 | [log/failure-cases.md](../log/failure-cases.md) |
 
 ---
 

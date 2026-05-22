@@ -19,12 +19,12 @@ aliases: [内核, 深度优化, 原理]
 | 借鉴的范式 | 在本项目对应什么 | 关键论断 |
 |------------|------------------|----------|
 | **编译器流水线** | Frame → Anchor → Decompose → Execute | 阶段间靠"中间表示"传递，不靠对话记忆 |
-| **状态机 / Event Sourcing** | [[state-machine\|state.md]] | 进度=状态，断点续跑靠重放状态 |
+| **状态机 / Event Sourcing** | [state.md（模板）](../runs/_state-template.md) | 进度=状态，断点续跑靠重放状态 |
 | **Map-Reduce** | Supervisor 派 Worker + 整合 | 并行执行 + 串行整合，原子任务无副作用 |
-| **Case-Based Reasoning（CBR）** | [[anchor-mechanism\|anchor 样本库]] | 用具体案例比用抽象规则更准 |
+| **Case-Based Reasoning（CBR）** | [anchors/ 样本库](../anchors/index.md) | 用具体案例比用抽象规则更准 |
 | **Rubric + 范例对照评估** | Phase 4 验收（anchor_based） | 双信号验收：结构 + 内容 |
-| **Constraint propagation** | [[constraints\|constraints.md]] + project-types | 约束前置注入，避免事后清洗 |
-| **PDCA / 失败归因** | `log/failure-cases.md` + rework 上限 | 失败是数据，不是噪声 |
+| **Constraint propagation** | [constraints.md](../config/constraints.md) + [project-types/](../config/project-types/) | 约束前置注入，避免事后清洗 |
+| **PDCA / 失败归因** | [log/failure-cases.md](../log/failure-cases.md) + rework 上限 | 失败是数据，不是噪声 |
 
 下面按"项目可深度优化的部分"展开，每条都点到**原理 → 当前实现 → 深化路径**。
 
@@ -40,7 +40,7 @@ aliases: [内核, 深度优化, 原理]
 
 ### 深化路径
 - **a. IR 形式化**：给 frame、decompose 定义结构化 schema（YAML/JSON），Worker 读结构而不是读文本。例如 `decompose.tasks[].acceptance_signal` 是字段而不是段落
-- **b. IR 验证器**：每阶段产出后跑校验（如"已知必须能引回 00-input.md"是 [[claude-md#§1-结构性铁律|铁律 6]]，目前靠人）
+- **b. IR 验证器**：每阶段产出后跑校验（如"已知必须能引回 00-input.md"是 [CLAUDE.md §1](../CLAUDE.md) 铁律 6，目前靠人）
 - **c. IR 可视化**：Obsidian 里写一个 dataview 视图，把所有 Run 的 IR 提取出来横向比较
 
 ---
@@ -51,7 +51,7 @@ aliases: [内核, 深度优化, 原理]
 **事件溯源**的核心：系统状态 = 一串事件的折叠（fold）。任何时刻可以从事件流重建当前状态。崩溃恢复 = 重放事件。
 
 ### 当前实现
-`state.md` 是**快照式**，不是事件流。Supervisor 在 6 个状态变化点写整份快照（[[architecture-tuning#state-md-状态机|state.md 状态机]]）。优点：人类可读；缺点：丢中间事件，无法回放过去某个时点。
+`state.md` 是**快照式**，不是事件流。Supervisor 在 6 个状态变化点写整份快照（[[architecture-tuning#state.md 状态机]]）。优点：人类可读；缺点：丢中间事件，无法回放过去某个时点。
 
 ### 深化路径
 - **a. 双写**：保留 `state.md` 给人看，另写 `events.jsonl` 追加事件流（一行一事件），供"时间旅行"和审计
@@ -68,7 +68,7 @@ aliases: [内核, 深度优化, 原理]
 Map 阶段任务必须**无共享状态**才能真并行。一旦任务间有隐式依赖，并行就是假并行（结果靠运气）。
 
 ### 当前实现
-[[constraints#decompose|constraints.md]] 已经显式区分：
+[constraints.md](../config/constraints.md) 的 `[decompose]` 段已经显式区分：
 - `serial_only_tasks`: 整体框架 / 叙事线 / 跨模块衔接 / 评价体系 / 最终整合
 - `parallelizable_tasks`: 政策检索 / 案例收集 / 数据提取 / 单一活动模块
 
@@ -89,19 +89,19 @@ CBR 假设：**新问题最好的解法是检索一个相似的旧问题，复�
 - 适配（adaptation）比推导（derivation）认知负担低
 
 ### 当前实现
-[[anchor-mechanism|anchors/]] 系统是 CBR 的简化版：
-- 检索：靠 Supervisor 读 `index.md` 做语义匹配
+[anchors/](../anchors/) 系统是 CBR 的简化版（机制详情见 [[architecture-tuning#Anchor 机制]]）：
+- 检索：靠 Supervisor 读 [anchors/index.md](../anchors/index.md) 做语义匹配
 - 适配性检查：3 维度（类型 / 学段 / 结构可比）
 - 跳过路径：rubric_only 兜底
 
-**5th-grade-carbon-shiyou 那次**跳过了 Anchor，因为库内仅动物饲养类，主题完全不重叠——这是 CBR 失效的典型场景：**case base coverage gap**。
+**[5th-grade-carbon-shiyou](../runs/2026-05-21-5th-grade-carbon-shiyou/state.md) 那次**跳过了 Anchor，因为库内仅动物饲养类，主题完全不重叠——这是 CBR 失效的典型场景：**case base coverage gap**。
 
 ### 深化路径
-- **a. 检索从手动到半自动**：给 `anchors/index.md` 每条加 embedding（或简单的 keyword bag），Supervisor 检索时算相似度排序，而不是肉眼扫
+- **a. 检索从手动到半自动**：给 [anchors/index.md](../anchors/index.md) 每条加 embedding（或简单的 keyword bag），Supervisor 检索时算相似度排序，而不是肉眼扫
 - **b. 适配性矩阵显式化**：当前 3 维度是简化的。可以扩展到 (类型, 学段, 结构, 学科, 验收方, 资源约束) 6 维，让"为什么这个 anchor 不行"变成可解释的雷达图
-- **c. Anchor 反向利用**：当前 negative/ 几乎没用到。改造为"反 anchor 检查"：成品产出后跑一遍，确认没有踩过相同的坑
-- **d. Case base 自演化**：每个 Run 的 `final.md` 经用户确认后，自动建议入 anchors/。当前是手动加，所以库长不大
-- **e. 覆盖率可视化**：见 [[architecture-tuning#当前架构的优化空间|架构优化 #6]]，把"哪些主题维度没样本"做成视图，主动指导扩库方向
+- **c. Anchor 反向利用**：当前 [anchors/negative/](../anchors/negative/) 几乎没用到。改造为"反 anchor 检查"：成品产出后跑一遍，确认没有踩过相同的坑
+- **d. Case base 自演化**：每个 Run 的 `final.md` 经用户确认后，自动建议入 [anchors/positive/](../anchors/positive/)。当前是手动加，所以库长不大
+- **e. 覆盖率可视化**：见 [[architecture-tuning#当前架构的优化空间]] 第 6 条，把"哪些主题维度没样本"做成视图，主动指导扩库方向
 
 ---
 
@@ -111,12 +111,12 @@ CBR 假设：**新问题最好的解法是检索一个相似的旧问题，复�
 教育评估文献里早有结论：**全 rubric** 易导致打分机械、不可比；**全 example-based** 易过拟合范本。两者**互补**才稳。
 
 ### 当前实现
-`review_mode` 三档：`anchor_based` / `rubric_only` / `hybrid`，但 hybrid 模式具体怎么跑没文档化。
+`review_mode` 三档：`anchor_based` / `rubric_only` / `hybrid`，定义在 [config/constraints.md](../config/constraints.md) `[execute]` 段。但 hybrid 模式具体怎么跑没文档化。
 
 ### 深化路径
-- **a. 明确 hybrid 协议**：anchor 比对结构，rubric 评内容。具体每个维度走哪条路，写进 [[constraints#execute|constraints.md]] 注释
+- **a. 明确 hybrid 协议**：anchor 比对结构，rubric 评内容。具体每个维度走哪条路，写进 [constraints.md](../config/constraints.md) 注释
 - **b. 双信号一致性检查**：anchor 和 rubric 给出不一致结论时，触发用户裁决（而不是 Supervisor 自决）
-- **c. rubric 也版本化**：`config/rubrics.md` 当前是一份。可以按 project-type 分裂，每类项目用专属 rubric
+- **c. rubric 也版本化**：[config/rubrics.md](../config/rubrics.md) 当前是一份。可以按 project-type 分裂，每类项目用专属 rubric
 
 ---
 

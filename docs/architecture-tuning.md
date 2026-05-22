@@ -51,10 +51,11 @@ aliases: [架构, 调参, 架构调参]
 
 | Phase | 名字 | 干什么 | 产出 | 调参入口 |
 |-------|------|--------|------|----------|
-| 1 | **Frame** | 把模糊需求结构化成"已知/未知/假设"三栏 | `01-frame.md` | [[constraints#brainstorm]] |
-| 2 | **Anchor** | 从样本库选一个参照，做适配性检查 | `02-anchor.md` | [[constraints#anchor]] |
-| 3 | **Decompose** | 拆成 10-30 分钟的原子任务，标串行/并行 | `03-decompose.md` | [[constraints#decompose]] |
-| 4 | **Execute** | 派 Worker 执行 + 验收 + 整合 | `04-execute/*.md` + `final.md` | [[constraints#execute]] |
+| 1 | **Frame** | 把模糊需求结构化成"已知/未知/假设"三栏 | `01-frame.md` | [constraints `[brainstorm]`](../config/constraints.md) |
+| 2 | **Anchor** | 从样本库选一个参照，做适配性检查 | `02-anchor.md` | [constraints `[anchor]`](../config/constraints.md) |
+| 3 | **Decompose** | 拆成 10-30 分钟的原子任务，标串行/并行 | `03-decompose.md` | [constraints `[decompose]`](../config/constraints.md) |
+| 4 | **Execute** | 派 Worker 执行 + 验收 + 整合 | `04-execute/*.md` + `final.md` | [constraints `[execute]`](../config/constraints.md) |
+| 4+ | **Index** | 自动生成 Run 索引(中文导览) | `index.md` | [constraints `[execute]`](../config/constraints.md) `require_run_index` |
 
 **B 级**只跑 Phase 1 + Phase 4（中间夹个 Mini-plan），**A 级**根本不进流水线。判级逻辑见后。
 
@@ -62,7 +63,7 @@ aliases: [架构, 调参, 架构调参]
 
 ## 任务级别判定
 
-`CLAUDE.md §3` 定义了 5 问完整版，Supervisor **默认走简短判定**（直接给建议+理由），只有以下情况展开 5 问：
+[CLAUDE.md](../CLAUDE.md) §3 定义了 5 问完整版，Supervisor **默认走简短判定**（直接给建议+理由），只有以下情况展开 5 问：
 
 - 用户首次使用前 3 个 Run
 - Supervisor 自己难判
@@ -87,7 +88,9 @@ aliases: [架构, 调参, 架构调参]
 - `workers_in_flight` / `workers_completed` — Phase 4 派工情况
 - `config_snapshot` — Run 开始时的 git HEAD（防止中途改参数污染）
 
-**读写规则**（[[claude-md#§1-结构性铁律|铁律]]）：以下"状态变化点"必须读写，其他动作不写（避免成本失控）：
+模板见 [runs/_state-template.md](../runs/_state-template.md)，真实例子见 [runs/2026-05-21-5th-grade-carbon-shiyou/state.md](../runs/2026-05-21-5th-grade-carbon-shiyou/state.md)。
+
+**读写规则**（[CLAUDE.md §1](../CLAUDE.md) 铁律 1）：以下"状态变化点"必须读写，其他动作不写（避免成本失控）：
 
 1. 阶段开始前（读）
 2. 阶段结束后（写）
@@ -116,9 +119,11 @@ anchors/
 
 每条索引项包含：**类型 / 适用项目 / 优点 / 缺点 / 可参照维度 / 来源 / 加入时间**。Supervisor 用这些字段做匹配。
 
+索引文件：[anchors/index.md](../anchors/index.md)
+
 ### 适配性检查
 
-提议 anchor 后做 3 维度检查（默认阈值 2/3 通过，[[constraints#anchor|anchor_fitness_threshold]]）：
+提议 anchor 后做 3 维度检查（默认阈值 2/3 通过，见 [config/constraints.md](../config/constraints.md) `[anchor]` 段的 `anchor_fitness_threshold`）：
 
 1. 类型匹配
 2. 学段/对象匹配
@@ -128,13 +133,13 @@ anchors/
 
 ### 跳过路径
 
-库里实在没匹配的（如 `runs/2026-05-21-5th-grade-carbon-shiyou` 那次）：用户可选 `rubric_only`，但 Supervisor 必须先复述 ≥2 条风险后果，确认后写入 `skipped_reason` + `risk_note`。
+库里实在没匹配的（如 [runs/2026-05-21-5th-grade-carbon-shiyou](../runs/2026-05-21-5th-grade-carbon-shiyou/state.md) 那次）：用户可选 `rubric_only`，但 Supervisor 必须先复述 ≥2 条风险后果，确认后写入 `skipped_reason` + `risk_note`。
 
 ---
 
 ## 调参手柄
 
-**全部在 [[constraints|config/constraints.md]]**，下次 Run 生效，进行中的 Run 不受影响。
+**全部在 [config/constraints.md](../config/constraints.md)**，下次 Run 生效，进行中的 Run 不受影响。
 
 ### `[brainstorm]` Phase 1 澄清
 - `mode`: `always` / `dynamic` / `off`
@@ -174,14 +179,14 @@ anchors/
 - **Supervisor**（默认角色）：全局视野，协调四阶段，可自任串行任务（如"整体框架"、"叙事线"、"最终整合"）
 - **Worker**（派生子智能体）：仅执行单一原子任务，**无全局上下文**
 
-派 Worker 必须注入完整 5 段提示词（[[claude-md#§1-结构性铁律|铁律 3]]）：
+派 Worker 必须注入完整 5 段提示词（[CLAUDE.md §1](../CLAUDE.md) 铁律 3）：
 1. 身份
 2. 任务定义
 3. 输入依赖
 4. 输出格式
 5. 边界（不许干什么）
 
-Worker 不自动继承 `CLAUDE.md`，所以这 5 段是它的全部世界。
+Worker 不自动继承 [CLAUDE.md](../CLAUDE.md)，所以这 5 段是它的全部世界。
 
 ---
 
@@ -191,7 +196,7 @@ Worker 不自动继承 `CLAUDE.md`，所以这 5 段是它的全部世界。
 
 ### 1. project-types 预设系统**未激活**
 
-`config/project-types/_template.md` 摆着，但实际 Run 都是 `untyped`（看 `runs/2026-05-21-5th-grade-carbon-shiyou/state.md` 的 `project_type` 字段）。激活后能：
+[config/project-types/_template.md](../config/project-types/_template.md) 摆着，但实际 Run 都是 `untyped`（看 [runs/2026-05-21-5th-grade-carbon-shiyou/state.md](../runs/2026-05-21-5th-grade-carbon-shiyou/state.md) 的 `project_type` 字段）。激活后能：
 - 命中类型时跳澄清（`skip_if_template_match: true`）
 - 预填 must_ask_about
 - 自动绑定推荐 anchor
@@ -200,7 +205,7 @@ Worker 不自动继承 `CLAUDE.md`，所以这 5 段是它的全部世界。
 
 ### 2. anchor 索引是手动维护的
 
-`anchors/index.md` 每加样本要手动追加元数据。改造方向：
+[anchors/index.md](../anchors/index.md) 每加样本要手动追加元数据。改造方向：
 - 在样本文件顶部用 YAML frontmatter 写元数据，写个脚本/Worker 自动重建 index
 - 或者直接让 Supervisor 在加样本时同步写索引（已部分实现，但靠提醒）
 
@@ -216,7 +221,7 @@ Worker 不自动继承 `CLAUDE.md`，所以这 5 段是它的全部世界。
 
 ### 5. failure-cases 是被动记录，没有 pattern 抽取
 
-`log/failure-cases.md` 只追加，没人回头看。可以加一步：每 N 次 failure 触发一个"模式归纳" Worker，把共性写进 `log/anti-patterns.md`，作为 Supervisor 派工前的检查项。
+[log/failure-cases.md](../log/failure-cases.md) 只追加，没人回头看。可以加一步：每 N 次 failure 触发一个"模式归纳" Worker，把共性写进 `log/anti-patterns.md`，作为 Supervisor 派工前的检查项。
 
 ### 6. anchor 跳过率应该是个监控指标
 
@@ -230,7 +235,7 @@ Worker 不自动继承 `CLAUDE.md`，所以这 5 段是它的全部世界。
 
 ## 结构性铁律（改之前必读）
 
-`CLAUDE.md §1` 列了 6 条铁律。**调架构时这 6 条不能违反**，否则系统的"可恢复"保证失效：
+[CLAUDE.md §1](../CLAUDE.md) 列了 7 条铁律。**调架构时这 7 条不能违反**，否则系统的"可恢复"保证失效：
 
 1. state.md 必须在 6 个状态变化点维护
 2. 文件结构必须遵守 Phase 1-4 模板
@@ -238,6 +243,7 @@ Worker 不自动继承 `CLAUDE.md`，所以这 5 段是它的全部世界。
 4. 跳过必须记录 skipped_reason + risk_note
 5. 配置变更必须记到 `log/tuning-history.md`
 6. Phase 1 的"已知"必须可追溯到用户原文
+7. B/C 级 Run 在 final.md 后必须建 `runs/<id>/index.md`（中文导览，模板见 [runs/_index-template.md](../runs/_index-template.md)）
 
 **为什么是铁律**：每条都对应一个"如果违反，断点续跑/事后追溯/失败归因 至少一个会废"的失效模式。
 
@@ -248,5 +254,5 @@ Worker 不自动继承 `CLAUDE.md`，所以这 5 段是它的全部世界。
 - 怎么用 → [[user-guide]]
 - 内核层借鉴的范式、深度优化方向 → [[deep-optimization]]
 - 完整规范 → `../../project-orchestrator-dev-guide-v0.2.1.md`（如有）
-- 调参历史 → `../log/tuning-history.md`
-- 失败案例 → `../log/failure-cases.md`
+- 调参历史 → [../log/tuning-history.md](../log/tuning-history.md)
+- 失败案例 → [../log/failure-cases.md](../log/failure-cases.md)

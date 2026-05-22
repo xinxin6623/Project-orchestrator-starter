@@ -40,6 +40,15 @@
 
 6. **Phase 1 的"已知"必须可追溯到用户原文**
 
+7. **Run 索引必须建立**:B/C 级 Run 在 final.md 产出后,**必须**在 `runs/<id>/index.md` 生成索引文档,包含:
+   - 一句话回顾(用户需求 + 判级 + 关键决策)
+   - 文件结构地图(ASCII 树状图,★ 标记重点)
+   - 各文件中文说明(按生命周期分组,每文件一行)
+   - 关键决策与豁免汇总表
+   - 给后来人的提示(复盘 / 入样本库 / 复用拆解)
+   - 所有引用用相对路径链接,跨目录引用 docs 用 `[[wikilink]]`
+   模板见 `runs/_index-template.md`。A 级 Run 不要求(无 runs/ 目录)。
+
 ---
 
 ## §2 流程性默认(可豁免,但需留痕)
@@ -103,13 +112,14 @@ Worker **不会**自动继承本文件,Supervisor 派工时**必须**注入完�
 ## §5 阶段产出文件命名
 
 `runs/<日期>-<项目短名>/`:
+- `index.md` **Run 索引**(人类导览,final.md 后必建,见 §1 铁律 7)
 - `state.md` 状态机(机器可读)
 - `00-input.md` 原始输入
 - `01-frame.md` Phase 1(B 级末尾追加 Mini-plan)
 - `02-anchor.md` Phase 2(C 级)
 - `03-decompose.md` Phase 3(C 级)
 - `04-execute/` Phase 4 目录
-  - `worker-N.N.md`
+  - `supervisor-N.M.md` / `worker-N.M.md`
   - `final.md`
 - `review.md` 差异分析或 rubric 自查
 
